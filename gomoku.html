@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Backgammon</title>
+</head>
+<body bgcolor="black"> 
+<canvas id="canvas" width="1000" height="1000">
+	This text is displayed if your browser does not support HTML5 Canvas.
+</canvas>
+<!--<script type='text/javascript' src='script.js'></script>-->
+		<script>
+
+var DrawTool = {
+	createNew: function(c){
+		var draw_tool = {};
+		draw_tool.context = c;
+		draw_tool.rect = function(x,y,length,Width){
+			draw_tool.context.fillStyle = "orange";
+			draw_tool.context.strokeStyle = "blue";
+			draw_tool.context.rect(x,y,length,Width);
+			draw_tool.context.fill();
+			draw_tool.context.stroke();
+		};
+		draw_tool.circle = function(color,x,y,r){
+			draw_tool.context.beginPath();
+			draw_tool.context.arc(x, y, r, 0, Math.PI*2, false);
+			draw_tool.context.fillStyle = color;
+			draw_tool.context.lineWidth = 3;
+			draw_tool.context.strokeStyle = color;
+			draw_tool.context.fill();
+			draw_tool.context.stroke();
+		};
+		draw_tool.line = function(x1, y1, x2, y2){
+			draw_tool.context.beginPath();
+			//context.arc(x, y, r, 0, Math.PI*2, false);
+			//context.fillStyle = color;
+			draw_tool.context.lineWidth = 2;
+			draw_tool.context.strokeStyle = "black";
+			draw_tool.context.moveTo(x1,y1);
+			draw_tool.context.lineTo(x2,y2);
+			draw_tool.context.stroke();
+		};
+		return draw_tool;
+	}
+}
+
+var Board = {
+	createNew: function(origin_left, origin_up, offset, unit, grid_num, draw_tool){
+		var board = {};
+		board.init = function(){
+			var length = unit * grid_num;
+			draw_tool.rect(origin_left - offset, origin_up - offset, length + 2*offset, length + 2*offset );
+			for(var g=0; g<=grid_num; g++) {
+				var l = unit*g;
+				draw_tool.line(origin_left, origin_up + l, origin_left + length, origin_up + l);
+				draw_tool.line(origin_left + l, origin_up, origin_left + l, origin_up + length);
+			}
+			var line_color = "black";
+			var point_radius = 5;
+			draw_tool.circle(line_color, origin_left + 3*unit, origin_up + 3*unit, point_radius);
+			draw_tool.circle(line_color, origin_left + 3*unit, origin_up + 15*unit, point_radius);
+			draw_tool.circle(line_color, origin_left + 15*unit, origin_up + 3*unit, point_radius);
+			draw_tool.circle(line_color, origin_left + 15*unit, origin_up + 15*unit, point_radius);
+			draw_tool.circle(line_color, origin_left + 9*unit, origin_up + 9*unit, point_radius);
+			draw_tool.circle(line_color, origin_left + 3*unit, origin_up + 9*unit, point_radius);
+			draw_tool.circle(line_color, origin_left + 15*unit, origin_up + 9*unit, point_radius);
+			draw_tool.circle(line_color, origin_left + 9*unit, origin_up + 3*unit, point_radius);
+			draw_tool.circle(line_color, origin_left + 9*unit, origin_up + 15*unit, point_radius);
+		}
+		board.draw_circle = function(playerTurn, xx, yy){
+			draw_tool.circle((playerTurn==0)?"black":"white", origin_left + xx * unit , origin_up + yy * unit ,20 );
+		}
+		board.isInBoard = function(x, y){
+			var length = unit * grid_num;
+			return origin_left-offset < x && x < origin_left + length + offset && origin_up-offset < y && y < origin_up + length + offset ;
+		}
+		board.mapping = function(x, y){
+			var xx = Math.round((x - origin_left)/unit);
+			var yy = Math.round((y - origin_up)/unit);
+			return [xx, yy];
+		}
+		return board;
+	}
+}
+
+function array1d(len1){
+	var row = [];
+	for(var j=0;j<len1;j++)
+		row.push(-1);
+	return row;
+}
+
+function array2d(len1, len2){
+	var row = [];
+	for(var j=0;j<len2;j++)
+		row.push(-1);
+	var table = [];
+	for(var i=0;i<len1;i++)
+		table.push(row.slice());
+	return table;
+}
+
+
+
+var State = {
+	createNew: function(origin_left, origin_up, offset, unit, grid_num, draw_tool){
+		var state = {};
+		state.board = Board.createNew(origin_left, origin_up, offset, unit, grid_num, draw_tool);
+		state.table = array2d(grid_num+1, grid_num+1);
+		state.history = [];
+		state.takeAction = function(action, playerTurn){
+			state.history.push(action.slice());
+			var xx = action[0];
+			var yy = action[1];
+			if(state.table[xx][yy] != -1) return;
+			state.table[xx][yy]=playerTurn;
+			state.board.draw_circle(playerTurn, xx, yy); 
+		}
+		state.reverseAction = function(action, playerIndex){
+		}
+		state.getProgress = function(playerIndex){
+		}
+		state.isWin = function(playerTurn){
+			var l = state.history.length;
+			if(l<4) return false;
+			var xx = state.history[l-1][0];
+			var yy = state.history[l-1][1];
+			/*
+			      n3
+			    n4 | n2
+			   n5 -|- n1
+			    n6 | n8
+			      n7
+			 */
+			var n1, n2, n3, n4, n5, n6, n7, n8;
+			for(var k=xx; k<=grid_num; ++k){
+				if(state.table[k][yy]!=playerTurn) break;
+			}
+			n1 = k-xx;
+
+			for(var k=0; xx+k<=grid_num && yy-k>=0; ++k){
+				if(state.table[xx+k][yy-k]!=playerTurn) break;
+			}
+			n2=k;
+
+			for(var k=yy; k>=0; --k){
+				if(state.table[xx][k]!=playerTurn) break;
+			}
+			n3=yy-k;
+
+			for(var k=0; xx-k>=0 && yy-k>=0;++k){
+				if(state.table[xx-k][yy-k]!=playerTurn) break;
+			}
+			n4=k;
+
+			for(var k=xx; k>=0;--k){
+				if(state.table[k][yy]!=playerTurn) break;
+			}
+			n5 =xx-k;
+
+			for(var k=0; xx-k>=0 && yy+k<=grid_num;++k){
+				if(state.table[xx-k][yy+k]!=playerTurn) break;
+			}
+			n6=k;
+
+			for(var k=yy; k<=grid_num; ++k){
+				if(state.table[xx][k]!=playerTurn) break;
+			}
+			n7=k-yy;
+
+			for(var k=0; xx+k<=grid_num && yy+k<=grid_num;++k){
+				if(state.table[xx+k][yy+k]!=playerTurn) break;
+			}
+			n8=k;
+
+			if(n1+n5-1 >=5 || n2+n6-1 >=5 || n3+n7-1 >=5 || n4+n8-1 >=5 ) {
+				var winner = (playerTurn==0)?"black":"white";
+				window.alert( winner + " win!!");
+				return true;
+			}
+			return false;
+		}
+
+		return state;
+	}
+}
+
+var Game = {
+	createNew: function(agent0, agent1, origin_left, origin_up, offset, unit, grid_num){
+		var game = {};
+		game.playerTurn = 0;
+		game.canvas = document.getElementById("canvas");
+		game.state = State.createNew(origin_left, origin_up, offset, unit, grid_num, DrawTool.createNew(game.canvas.getContext("2d")) );
+		game.agents = [agent0.createNew(game.state, 0), agent1.createNew(game.state, 1)];
+		game.isEnd = function(){
+			return game.state.isWin( game.playerTurn );
+		}
+		game.start = function(){
+			function doMouseDown(event){
+				do{
+					var agent = game.agents[game.playerTurn];
+					var action;
+					if(agent.isManual()){
+						var x = event.pageX;
+						var y = event.pageY;
+						//console.log([x, y]);
+						if( game.state.board.isInBoard(x,y) == false) return;
+						action = game.state.board.mapping(x,y);
+					}
+					else action = agent.getAction();
+					//console.log(action);
+					game.state.takeAction(action, game.playerTurn);
+					var is_end = game.isEnd();
+					game.takeTurn();
+					var is_next_manual = (game.agents[game.playerTurn].isManual());
+				} while(!is_end && !is_next_manual);
+			}
+			game.canvas.addEventListener("mousedown", doMouseDown, false);
+			do {
+				var agent = game.agents[game.playerTurn];
+				if(agent.isManual()) return;
+				else action = agent.getAction();
+				game.state.takeAction(action, game.playerTurn);
+				var is_end = game.isEnd();
+				game.takeTurn();
+			} while(!is_end);
+		}
+		game.takeTurn = function(){
+			game.playerTurn = (game.playerTurn+1)%2;
+		}
+		return game;
+	}
+}
+
+var MANUAL_Agent = {
+	createNew: function(state, index, canvas){
+		var agent = {};
+        	agent.playerIndex = index;
+        	agent.state = state;
+		agent.getAction = function(){
+		}
+		agent.isManual = function(){
+			return true;
+		}
+		agent.getName = function(){
+			return "manual";
+		}
+		return agent;
+	}
+}
+
+
+
+game = Game.createNew(agent0 = MANUAL_Agent, agent1 = MANUAL_Agent, origin_left = 50, origin_up = 50, offset = 20, unit = 50, grid_num = 18);
+game.state.board.init();
+game.start();
+
+		</script>
+</body>
+</html>
