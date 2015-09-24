@@ -50,7 +50,7 @@ var Board = {
 		board.init = function(){
 			var length = unit * grid_num;
 			draw_tool.rect(origin_left - offset, origin_up - offset, length + 2*offset, length + 2*offset );
-			for(var g=0; g<=grid_num; g++) {
+			for(var g=0; g<grid_num+1; g++) {
 				var l = unit*g;
 				draw_tool.line(origin_left, origin_up + l, origin_left + length, origin_up + l);
 				draw_tool.line(origin_left + l, origin_up, origin_left + l, origin_up + length);
@@ -67,17 +67,17 @@ var Board = {
 			draw_tool.circle(line_color, origin_left + 9*unit, origin_up + 3*unit, point_radius);
 			draw_tool.circle(line_color, origin_left + 9*unit, origin_up + 15*unit, point_radius);
 		}
-		board.draw_circle = function(playerTurn, xx, yy){
-			draw_tool.circle((playerTurn==0)?"black":"white", origin_left + xx * unit , origin_up + yy * unit ,20 );
+		board.draw_circle = function(playerTurn, x, y){
+			draw_tool.circle((playerTurn==0)?"black":"white", origin_left + x * unit , origin_up + y * unit , unit/3);
 		}
-		board.isInBoard = function(x, y){
+		board.isInBoard = function(xx, yy){
 			var length = unit * grid_num;
-			return origin_left-offset < x && x < origin_left + length + offset && origin_up-offset < y && y < origin_up + length + offset ;
+			return origin_left-offset < xx && xx < origin_left + length + offset && origin_up-offset < yy && yy < origin_up + length + offset ;
 		}
-		board.mapping = function(x, y){
-			var xx = Math.round((x - origin_left)/unit);
-			var yy = Math.round((y - origin_up)/unit);
-			return [xx, yy];
+		board.mapping = function(xx, yy){
+			var x = Math.round((xx - origin_left)/unit);
+			var y = Math.round((yy - origin_up)/unit);
+			return [x, y];
 		}
 		return board;
 	}
@@ -106,25 +106,29 @@ var State = {
 	createNew: function(origin_left, origin_up, offset, unit, grid_num, draw_tool){
 		var state = {};
 		state.board = Board.createNew(origin_left, origin_up, offset, unit, grid_num, draw_tool);
-		state.table = array2d(grid_num+1, grid_num+1);
+		state.grid = grid_num+1;
+		state.table = array2d(state.grid, state.grid);
 		state.history = [];
+		state.isActionLegal = function(action){
+			var x = action[0];
+			var y = action[1];
+			if(x < 0 || y < 0 || x >= state.grid || y >= state.grid) return false;
+			return state.table[x][y] == -1;
+		}
 		state.takeAction = function(action, playerTurn){
+			if(state.isActionLegal(action) == false) return;
 			state.history.push(action.slice());
-			var xx = action[0];
-			var yy = action[1];
-			if(state.table[xx][yy] != -1) return;
-			state.table[xx][yy]=playerTurn;
-			state.board.draw_circle(playerTurn, xx, yy); 
+			var x = action[0];
+			var y = action[1];
+			state.table[x][y]=playerTurn;
+			state.board.draw_circle(playerTurn, x, y); 
 		}
 		state.reverseAction = function(action, playerIndex){
 		}
 		state.getProgress = function(playerIndex){
 		}
-		state.isWin = function(playerTurn){
-			var l = state.history.length;
-			if(l<4) return false;
-			var xx = state.history[l-1][0];
-			var yy = state.history[l-1][1];
+		state.get_connect_nums = function(x, y){
+			var turn = state.table[x][y];
 			/*
 			      n3
 			    n4 | n2
@@ -133,52 +137,104 @@ var State = {
 			      n7
 			 */
 			var n1, n2, n3, n4, n5, n6, n7, n8;
-			for(var k=xx; k<=grid_num; ++k){
-				if(state.table[k][yy]!=playerTurn) break;
+			for(var k=x; k<state.grid; ++k){
+				if(state.table[k][y]!=turn) break;
 			}
-			n1 = k-xx;
+			n1 = k-x;
 
-			for(var k=0; xx+k<=grid_num && yy-k>=0; ++k){
-				if(state.table[xx+k][yy-k]!=playerTurn) break;
+			for(var k=0; x+k<state.grid && y-k>=0; ++k){
+				if(state.table[x+k][y-k]!=turn) break;
 			}
 			n2=k;
 
-			for(var k=yy; k>=0; --k){
-				if(state.table[xx][k]!=playerTurn) break;
+			for(var k=y; k>=0; --k){
+				if(state.table[x][k]!=turn) break;
 			}
-			n3=yy-k;
+			n3=y-k;
 
-			for(var k=0; xx-k>=0 && yy-k>=0;++k){
-				if(state.table[xx-k][yy-k]!=playerTurn) break;
+			for(var k=0; x-k>=0 && y-k>=0;++k){
+				if(state.table[x-k][y-k]!=turn) break;
 			}
 			n4=k;
 
-			for(var k=xx; k>=0;--k){
-				if(state.table[k][yy]!=playerTurn) break;
+			for(var k=x; k>=0;--k){
+				if(state.table[k][y]!=turn) break;
 			}
-			n5 =xx-k;
+			n5 =x-k;
 
-			for(var k=0; xx-k>=0 && yy+k<=grid_num;++k){
-				if(state.table[xx-k][yy+k]!=playerTurn) break;
+			for(var k=0; x-k>=0 && y+k<state.grid;++k){
+				if(state.table[x-k][y+k]!=turn) break;
 			}
 			n6=k;
 
-			for(var k=yy; k<=grid_num; ++k){
-				if(state.table[xx][k]!=playerTurn) break;
+			for(var k=y; k<state.grid; ++k){
+				if(state.table[x][k]!=turn) break;
 			}
-			n7=k-yy;
+			n7=k-y;
 
-			for(var k=0; xx+k<=grid_num && yy+k<=grid_num;++k){
-				if(state.table[xx+k][yy+k]!=playerTurn) break;
+			for(var k=0; x+k<state.grid && y+k<state.grid;++k){
+				if(state.table[x+k][y+k]!=turn) break;
 			}
 			n8=k;
-
-			if(n1+n5-1 >=5 || n2+n6-1 >=5 || n3+n7-1 >=5 || n4+n8-1 >=5 ) {
-				var winner = (playerTurn==0)?"black":"white";
-				window.alert( winner + " win!!");
-				return true;
+			return [n1+n5-1, n2+n6-1, n3+n7-1, n4+n8-1];
+		}
+		state.isWin = function(playerTurn){
+			var l = state.history.length;
+			if(l<4) return false;
+			var x = state.history[l-1][0];
+			var y = state.history[l-1][1];
+			var connect_nums = state.get_connect_nums(x, y);
+			for(var i=0; i<4; ++i){
+				if(connect_nums[i] >= 5) {
+					var winner = (playerTurn==0)?"black":"white";
+					window.alert( winner + " win!!");
+					return true;
+				}
 			}
 			return false;
+		}
+		state.get_score = function(action, turn){
+			var x = action[0];
+			var y = action[1];
+			state.table[x][y]=turn;
+			var connect_nums = state.get_connect_nums(x, y);
+			state.table[x][y]=-1;
+			//console.log(connect_nums);
+			var score = 0;
+			for(var i=0; i<4; ++i){
+				if(connect_nums[i] > score) score = connect_nums[i];
+			}
+			return score * score;
+		}
+		state.push_candidate = function(x, y, turn, temp, candidates){
+			if(state.isActionLegal([x,y]) == false) return;
+			if(temp[x][y] == 1) return;
+			temp[x][y] = 1;
+			candidates.push( [[x, y], state.get_score([x,y],turn)] );
+		}
+		state.get_candidates = function(turn){
+			var candidates = [];
+			var temp = array2d(state.grid, state.grid);
+			for(var i=0; i < state.grid; ++i){
+				for(var j=0; j < state.grid; ++j){
+					if(state.isActionLegal([i,j]) == false){
+						for(var n = 1; n<3; ++n) {
+							state.push_candidate(i+n, j, turn, temp, candidates);
+							state.push_candidate(i+n, j+n, turn, temp, candidates);
+							state.push_candidate(i,   j+n, turn, temp, candidates);
+							state.push_candidate(i-n, j+n, turn, temp, candidates);
+							state.push_candidate(i-n, j, turn, temp, candidates);
+							state.push_candidate(i-n, j-n, turn, temp, candidates);
+							state.push_candidate(i,   j-n, turn, temp, candidates);
+							state.push_candidate(i+n, j-n, turn, temp, candidates);
+						}
+					}
+				}
+			}
+			candidates.sort( function(a, b){
+				return b[1] - a[1];
+			} );
+			return candidates;
 		}
 
 		return state;
@@ -201,14 +257,15 @@ var Game = {
 					var agent = game.agents[game.playerTurn];
 					var action;
 					if(agent.isManual()){
-						var x = event.pageX;
-						var y = event.pageY;
-						//console.log([x, y]);
-						if( game.state.board.isInBoard(x,y) == false) return;
-						action = game.state.board.mapping(x,y);
+						var xx = event.pageX;
+						var yy = event.pageY;
+						//console.log([xx, yy]);
+						if( game.state.board.isInBoard(xx,yy) == false) return;
+						action = game.state.board.mapping(xx,yy);
 					}
 					else action = agent.getAction();
 					//console.log(action);
+					if(game.state.isActionLegal(action) == false) return;
 					game.state.takeAction(action, game.playerTurn);
 					var is_end = game.isEnd();
 					game.takeTurn();
@@ -220,6 +277,7 @@ var Game = {
 				var agent = game.agents[game.playerTurn];
 				if(agent.isManual()) return;
 				else action = agent.getAction();
+				if(game.state.isActionLegal(action) == false) return;
 				game.state.takeAction(action, game.playerTurn);
 				var is_end = game.isEnd();
 				game.takeTurn();
@@ -232,26 +290,42 @@ var Game = {
 	}
 }
 
-var MANUAL_Agent = {
-	createNew: function(state, index, canvas){
+var Manual_Agent = {
+	createNew: function(state, myTurn, canvas){
 		var agent = {};
-        	agent.playerIndex = index;
-        	agent.state = state;
-		agent.getAction = function(){
-		}
-		agent.isManual = function(){
-			return true;
-		}
-		agent.getName = function(){
-			return "manual";
-		}
+		agent.isManual = function(){ return true;}
+		agent.getName = function(){ return "manual";}
 		return agent;
 	}
 }
 
 
+var Reflex_Agent = {
+	createNew: function(state, myTurn, canvas){
+		var agent = {};
+		agent.getAction = function(){
+			var opponent = (myTurn + 1)%2;
+			var candidates = state.get_candidates(opponent);
+			var max_s = 0; 
+			var final_action;
+			for(var index in candidates){
+				var action = candidates[index][0];
+				var s = state.get_score(action, myTurn) + candidates[index][1];
+				if(s > max_s) {
+					max_s = s;
+					final_action = action;
+				}
+			}
+			return final_action;
+		}
+		agent.isManual = function(){ return false;}
+		agent.getName = function(){ return "reflex";}
+		return agent;
+	}
+}
 
-game = Game.createNew(agent0 = MANUAL_Agent, agent1 = MANUAL_Agent, origin_left = 50, origin_up = 50, offset = 20, unit = 50, grid_num = 18);
+
+game = Game.createNew(agent0 = Manual_Agent, agent1 = Reflex_Agent, origin_left = 50, origin_up = 50, offset = 20, unit = 30, grid_num = 18);
 game.state.board.init();
 game.start();
 
