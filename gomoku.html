@@ -128,6 +128,9 @@ var State = {
 		state.getProgress = function(playerIndex){
 		}
 		state.get_connect_nums = function(x, y){
+			function block_or_not(i,j){
+				return (state.table[i][j]==-1) ? 0.4 : 0;
+			}
 			var turn = state.table[x][y];
 			/*
 			      n3
@@ -141,41 +144,49 @@ var State = {
 				if(state.table[k][y]!=turn) break;
 			}
 			n1 = k-x;
+			n1 += block_or_not(k,y);
 
 			for(var k=0; x+k<state.grid && y-k>=0; ++k){
 				if(state.table[x+k][y-k]!=turn) break;
 			}
 			n2=k;
+			n2 += block_or_not(x+k,y-k);
 
 			for(var k=y; k>=0; --k){
 				if(state.table[x][k]!=turn) break;
 			}
 			n3=y-k;
+			n3 += block_or_not(x,k);
 
 			for(var k=0; x-k>=0 && y-k>=0;++k){
 				if(state.table[x-k][y-k]!=turn) break;
 			}
 			n4=k;
+			n4 += block_or_not(x-k,y-k);
 
 			for(var k=x; k>=0;--k){
 				if(state.table[k][y]!=turn) break;
 			}
 			n5 =x-k;
+			n5 += block_or_not(k,y);
 
 			for(var k=0; x-k>=0 && y+k<state.grid;++k){
 				if(state.table[x-k][y+k]!=turn) break;
 			}
 			n6=k;
+			n6 += block_or_not(x-k,y+k);
 
 			for(var k=y; k<state.grid; ++k){
 				if(state.table[x][k]!=turn) break;
 			}
 			n7=k-y;
+			n7 += block_or_not(x,k);
 
 			for(var k=0; x+k<state.grid && y+k<state.grid;++k){
 				if(state.table[x+k][y+k]!=turn) break;
 			}
 			n8=k;
+			n8 += block_or_not(x+k,y+k);
 			return [n1+n5-1, n2+n6-1, n3+n7-1, n4+n8-1];
 		}
 		state.isWin = function(playerTurn){
@@ -204,36 +215,33 @@ var State = {
 			for(var i=0; i<4; ++i){
 				if(connect_nums[i] > score) score = connect_nums[i];
 			}
-			return score * score;
+			return score * score * score;
 		}
-		state.push_candidate = function(x, y, turn, temp, candidates){
+		state.push_candidate = function(x, y, temp, candidates){
 			if(state.isActionLegal([x,y]) == false) return;
 			if(temp[x][y] == 1) return;
 			temp[x][y] = 1;
-			candidates.push( [[x, y], state.get_score([x,y],turn)] );
+			candidates.push( [x, y] );
 		}
-		state.get_candidates = function(turn){
+		state.get_candidates = function(){
 			var candidates = [];
 			var temp = array2d(state.grid, state.grid);
 			for(var i=0; i < state.grid; ++i){
 				for(var j=0; j < state.grid; ++j){
 					if(state.isActionLegal([i,j]) == false){
 						for(var n = 1; n<3; ++n) {
-							state.push_candidate(i+n, j, turn, temp, candidates);
-							state.push_candidate(i+n, j+n, turn, temp, candidates);
-							state.push_candidate(i,   j+n, turn, temp, candidates);
-							state.push_candidate(i-n, j+n, turn, temp, candidates);
-							state.push_candidate(i-n, j, turn, temp, candidates);
-							state.push_candidate(i-n, j-n, turn, temp, candidates);
-							state.push_candidate(i,   j-n, turn, temp, candidates);
-							state.push_candidate(i+n, j-n, turn, temp, candidates);
+							state.push_candidate(i+n, j, temp, candidates);
+							state.push_candidate(i+n, j+n, temp, candidates);
+							state.push_candidate(i,   j+n, temp, candidates);
+							state.push_candidate(i-n, j+n, temp, candidates);
+							state.push_candidate(i-n, j, temp, candidates);
+							state.push_candidate(i-n, j-n, temp, candidates);
+							state.push_candidate(i,   j-n, temp, candidates);
+							state.push_candidate(i+n, j-n, temp, candidates);
 						}
 					}
 				}
 			}
-			candidates.sort( function(a, b){
-				return b[1] - a[1];
-			} );
 			return candidates;
 		}
 
@@ -304,13 +312,13 @@ var Reflex_Agent = {
 	createNew: function(state, myTurn, canvas){
 		var agent = {};
 		agent.getAction = function(){
-			var opponent = (myTurn + 1)%2;
-			var candidates = state.get_candidates(opponent);
+			var candidates = state.get_candidates();
 			var max_s = 0; 
-			var final_action;
+			var final_action = [5,5];
 			for(var index in candidates){
-				var action = candidates[index][0];
-				var s = state.get_score(action, myTurn) + candidates[index][1];
+				var action = candidates[index];
+				var opponent = (myTurn + 1)%2;
+				var s = state.get_score(action, myTurn) + state.get_score(action, opponent);
 				if(s > max_s) {
 					max_s = s;
 					final_action = action;
@@ -325,7 +333,7 @@ var Reflex_Agent = {
 }
 
 
-game = Game.createNew(agent0 = Manual_Agent, agent1 = Reflex_Agent, origin_left = 50, origin_up = 50, offset = 20, unit = 30, grid_num = 18);
+game = Game.createNew(agent0 = Manual_Agent, agent1 = Reflex_Agent, origin_left = 50, origin_up = 50, offset = 20, unit = 50, grid_num = 18);
 game.state.board.init();
 game.start();
 
